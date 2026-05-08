@@ -1,0 +1,5 @@
+/target/
+/.kvstore/
+*.wal
+*.sst
+.DS_Store
