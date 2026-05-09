@@ -1,5 +1,38 @@
+# Rust build output
 /target/
+
+# Local KV store data
 /.kvstore/
+/kvstore-data/
+/data/
 *.wal
 *.sst
+*.db
+
+# Local demo/runtime files
+/tmp/
+*.log
+*.pid
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# macOS
 .DS_Store
+._*
+
+# Editors and IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Test and coverage artifacts
+/coverage/
+*.profraw
+*.profdata
+lcov.info
+

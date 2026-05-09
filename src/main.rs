@@ -5,7 +5,7 @@ use clap::{Parser, Subcommand};
 use kv_store::proto::kv_store_client::KvStoreClient;
 use kv_store::proto::{
     CompactRequest, CompactResponse, DeleteRequest, FlushRequest, FlushResponse, GetRequest,
-    PutRequest, ScanRequest, StatsRequest, StatsResponse,
+    PutRequest, ScanRequest, StatsRequest, StatsResponse, WatchEvent, WatchRequest,
 };
 use kv_store::server::grpc::{serve, ServerConfig};
 use kv_store::storage::{CompactionReport, StorageConfig, StorageEngine, StorageStats};
@@ -56,6 +56,10 @@ enum Commands {
     Flush,
     Compact,
     Stats,
+    Watch {
+        #[arg(long, default_value = "")]
+        prefix: String,
+    },
 }
 
 #[tokio::main]
@@ -114,6 +118,9 @@ fn run_local_command(config: StorageConfig, command: Commands) -> Result<(), Box
         Commands::Flush => print_local_flush(engine.flush_memtable()?),
         Commands::Compact => print_local_compact(engine.compact_all()?),
         Commands::Stats => print_local_stats(engine.stats()),
+        Commands::Watch { .. } => {
+            return Err("watch requires --endpoint because it streams server-side events".into());
+        }
     }
 
     Ok(())
@@ -164,6 +171,22 @@ async fn run_remote_command(endpoint: String, command: Commands) -> Result<(), B
         Commands::Stats => {
             let response = client.stats(StatsRequest {}).await?.into_inner();
             print_remote_stats(response);
+        }
+        Commands::Watch { prefix } => {
+            let mut stream = client.watch(WatchRequest { prefix }).await?.into_inner();
+            while let Some(event) = stream.message().await? {
+                let event_name =
+                    match WatchEvent::try_from(event.event).unwrap_or(WatchEvent::Unspecified) {
+                        WatchEvent::Put => "PUT",
+                        WatchEvent::Delete => "DELETE",
+                        WatchEvent::Unspecified => "UNKNOWN",
+                    };
+                if event.value.is_empty() {
+                    println!("{event_name} {}", event.key);
+                } else {
+                    println!("{event_name} {}={}", event.key, event.value);
+                }
+            }
         }
     }
 
